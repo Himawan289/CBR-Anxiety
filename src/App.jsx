@@ -97,6 +97,18 @@ export default function App() {
   const [cases, setCases] = useState([]);
   const [overrideDx, setOverrideDx] = useState("");
 
+  // 🌙 NEW: tema gelap/terang
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -169,6 +181,9 @@ export default function App() {
           </div>
         </div>
         <div className="header__right">
+          <button className="btn" onClick={toggleTheme}>
+            {theme === "dark" ? "🌞 Light Mode" : "🌙 Dark Mode"}
+          </button>
           <span className="badge">Retrieve • Reuse • Revise • Retain</span>
         </div>
       </header>
