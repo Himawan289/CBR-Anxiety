@@ -2,9 +2,23 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 const DISEASES = [
-  { code: "P1", name: "Generalized Anxiety Disorder (GAD)", description: "Kecemasan berlebihan dan kronis akan berbagai aspek kehidupan." },
-  { code: "P2", name: "Panic Disorder", description: "Serangan panik berulang dengan gejala fisik yang kuat." },
-  { code: "P3", name: "Specific Phobias", description: "Ketakutan intens & irasional terhadap objek/situasi tertentu." },
+  {
+    code: "P1",
+    name: "Generalized Anxiety Disorder (GAD)",
+    description:
+      "Kecemasan berlebihan dan kronis akan berbagai aspek kehidupan.",
+  },
+  {
+    code: "P2",
+    name: "Panic Disorder",
+    description: "Serangan panik berulang dengan gejala fisik yang kuat.",
+  },
+  {
+    code: "P3",
+    name: "Specific Phobias",
+    description:
+      "Ketakutan intens & irasional terhadap objek/situasi tertentu.",
+  },
 ];
 
 const SYMPTOMS = [
@@ -16,7 +30,7 @@ const SYMPTOMS = [
   { code: "G06", name: "Kecemasan berlebih", weights: { P1: 1, P2: 1 } },
   { code: "G07", name: "Merasa gelisah", weights: { P1: 1, P3: 1 } },
   { code: "G08", name: "Sulit berkonsentrasi", weights: { P1: 2 } },
-  { code: "G09", name: "Kewaspadaan yang berlebih", weights: { P1: 1 } },
+  { code: "G09", name: "Kewaspadaan yang berlebihan", weights: { P1: 1 } },
   { code: "G10", name: "Mudah marah", weights: { P1: 1 } },
   { code: "G11", name: "Kebutuhan untuk kontrol", weights: { P1: 2 } },
   { code: "G12", name: "Jantung berdebar-debar", weights: { P2: 2 } },
@@ -27,13 +41,25 @@ const SYMPTOMS = [
   { code: "G17", name: "Kesemutan", weights: { P2: 1 } },
   { code: "G18", name: "Menggigil", weights: { P2: 2 } },
   { code: "G19", name: "Merasa kehilangan kendali", weights: { P2: 2 } },
-  { code: "G20", name: "Menghindari tempat/situasi (serangan sebelumnya)", weights: { P2: 4 } },
-  { code: "G21", name: "Menghindari situasi yang diasosiasikan dgn serangan panik", weights: { P2: 4 } },
+  {
+    code: "G20",
+    name: "Menghindari tempat/situasi (serangan sebelumnya)",
+    weights: { P2: 4 },
+  },
+  {
+    code: "G21",
+    name: "Menghindari situasi yang diasosiasikan dgn serangan panik",
+    weights: { P2: 4 },
+  },
   { code: "G22", name: "Menghindari tempat ramai", weights: { P2: 3 } },
   { code: "G23", name: "Ketakutan intens", weights: { P3: 3 } },
   { code: "G24", name: "Sensasi tersendak", weights: { P3: 3 } },
   { code: "G25", name: "Kehilangan kekuatan otot", weights: { P3: 2 } },
-  { code: "G26", name: "Langkah besar menghindari objek/situasi ditakuti", weights: { P3: 4 } },
+  {
+    code: "G26",
+    name: "Langkah besar menghindari objek/situasi ditakuti",
+    weights: { P3: 4 },
+  },
   { code: "G27", name: "Berbagai cara agar merasa aman", weights: { P3: 3 } },
 ];
 
@@ -82,7 +108,8 @@ export default function App() {
     const q = query.trim().toLowerCase();
     if (!q) return SYMPTOMS;
     return SYMPTOMS.filter(
-      (s) => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+      (s) =>
+        s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
     );
   }, [query]);
 
@@ -133,20 +160,21 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    <div className="app dark-dashboard">
       <header className="app__header">
-        <div>
-          <h1>CBR Expert System – Anxiety Disorders</h1>
-          <p>
-            Metode: CBR dengan similarity berbobot. Pilih gejala → lihat skor → (opsional)
-            revisi → simpan kasus.
-          </p>
+        <div className="header__left">
+          <h1 className="brand">CBR Expert System</h1>
+          <div className="subtitle">
+            Anxiety Disorders — CBR (weighted similarity)
+          </div>
         </div>
-        <span className="badge">Retrieve → Reuse → Revise → Retain</span>
+        <div className="header__right">
+          <span className="badge">Retrieve • Reuse • Revise • Retain</span>
+        </div>
       </header>
 
       <main className="layout">
-        <section className="panel">
+        <section className="panel panel-left">
           <div className="panel__title">
             <h2>Gejala (Checklist)</h2>
             <div className="toolbar">
@@ -160,6 +188,7 @@ export default function App() {
               </button>
             </div>
           </div>
+
           <ul className="symptom-list">
             {filtered.map((row) => (
               <li key={row.code} className="symptom">
@@ -188,8 +217,9 @@ export default function App() {
           </ul>
         </section>
 
-        <section className="panel">
+        <section className="panel panel-mid">
           <h2 className="panel__heading">Hasil Similarity & Penjelasan</h2>
+
           {scores.map((s) => {
             const disease = DISEASES.find((d) => d.code === s.disease);
             return (
@@ -223,7 +253,8 @@ export default function App() {
                 {DISEASES.find((d) => d.code === top.disease)?.name}
               </div>
               <p>
-                Hasil otomatis berdasarkan gejala yang dipilih & bobot dari penelitian.
+                Hasil otomatis berdasarkan gejala yang dipilih & bobot dari
+                penelitian.
               </p>
             </div>
           )}
@@ -248,6 +279,7 @@ export default function App() {
                 </label>
               ))}
             </div>
+
             <div className="actions">
               <button className="btn btn--primary" onClick={retain}>
                 Retain: Simpan Kasus Ini
@@ -256,25 +288,28 @@ export default function App() {
                 Bersihkan Pilihan
               </button>
             </div>
+
             <p className="hint">
-              Catatan: ini alat bantu awal (triase). Untuk diagnosis pasti, konsultasikan
-              dengan profesional.
+              Catatan: ini alat bantu awal (triase). Untuk diagnosis pasti,
+              konsultasikan dengan profesional.
             </p>
           </div>
         </section>
 
-        <section className="panel">
+        <section className="panel panel-right">
           <h2 className="panel__heading">Case Base (Reuse / Retain)</h2>
           {cases.length === 0 ? (
             <p className="muted">
-              Belum ada kasus tersimpan. Simpan kasus dari panel hasil untuk mulai
-              membangun basis kasus.
+              Belum ada kasus tersimpan. Simpan kasus dari panel hasil untuk
+              mulai membangun basis kasus.
             </p>
           ) : (
             <ul className="case-list">
               {cases.map((c) => (
                 <li key={c.id} className="case-card">
-                  <div className="meta">{new Date(c.createdAt).toLocaleString()}</div>
+                  <div className="meta">
+                    {new Date(c.createdAt).toLocaleString()}
+                  </div>
                   <div className="result">
                     Hasil:{" "}
                     <strong>
@@ -302,7 +337,7 @@ export default function App() {
       </main>
 
       <footer className="app__footer">
-        <span>© {new Date().getFullYear()} CBR Expert System</span>
+        © {new Date().getFullYear()} CBR Expert System
       </footer>
     </div>
   );
