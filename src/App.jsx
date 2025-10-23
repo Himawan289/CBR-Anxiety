@@ -64,7 +64,9 @@ const SYMPTOMS = [
 ];
 
 function formatPct(x) {
-  return `${(x * 100).toFixed(1)}%`;
+  const pct = x * 100;
+  const truncated = Math.trunc(pct * 10) / 10;
+  return Number.isInteger(truncated) ? `${truncated}%` : `${truncated.toFixed(1)}%`;
 }
 
 function computeScores(selected) {
@@ -97,7 +99,6 @@ export default function App() {
   const [cases, setCases] = useState([]);
   const [overrideDx, setOverrideDx] = useState("");
 
-  // 🌙 NEW: tema gelap/terang
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
 
   useEffect(() => {
@@ -352,7 +353,7 @@ export default function App() {
       </main>
 
       <footer className="app__footer">
-        © {new Date().getFullYear()} CBR Expert System
+        © {new Date().getFullYear()} Kelompok 4 Sistem Berbasis Pengetahuana
       </footer>
     </div>
   );
