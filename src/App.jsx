@@ -66,7 +66,9 @@ const SYMPTOMS = [
 function formatPct(x) {
   const pct = x * 100;
   const truncated = Math.trunc(pct * 10) / 10;
-  return Number.isInteger(truncated) ? `${truncated}%` : `${truncated.toFixed(1)}%`;
+  return Number.isInteger(truncated)
+    ? `${truncated}%`
+    : `${truncated.toFixed(1)}%`;
 }
 
 function computeScores(selected) {
@@ -98,9 +100,9 @@ export default function App() {
   const [selected, setSelected] = useState(new Set());
   const [cases, setCases] = useState([]);
   const [overrideDx, setOverrideDx] = useState("");
-
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
 
+  // inisialisasi tema
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("theme", theme);
@@ -110,10 +112,25 @@ export default function App() {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  // load kasus dari localStorage atau tambahkan kasus baru jika kosong
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setCases(JSON.parse(raw));
+      if (raw) {
+        setCases(JSON.parse(raw));
+      } else {
+        const initialCase = {
+          id: "kasus_baru_sbp",
+          createdAt: new Date().toISOString(),
+          symptoms: [
+            "G05", "G26", "G08", "G14", "G20", "G07", "G17", "G25", "G04", "G27",
+          ],
+          result: "P3",
+          rawScores: { P1: 0.571, P2: 0.429, P3: 0.714 },
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([initialCase]));
+        setCases([initialCase]);
+      }
     } catch {}
   }, []);
 
@@ -190,6 +207,7 @@ export default function App() {
       </header>
 
       <main className="layout">
+        {/* Panel kiri */}
         <section className="panel panel-left">
           <div className="panel__title">
             <h2>Gejala (Checklist)</h2>
@@ -199,9 +217,7 @@ export default function App() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Cari kode/nama gejala..."
               />
-              <button className="btn" onClick={clearAll}>
-                Reset
-              </button>
+              <button className="btn" onClick={clearAll}>Reset</button>
             </div>
           </div>
 
@@ -233,34 +249,38 @@ export default function App() {
           </ul>
         </section>
 
+        {/* Panel tengah */}
         <section className="panel panel-mid">
           <h2 className="panel__heading">Hasil Similarity & Penjelasan</h2>
 
-          {scores.map((s) => {
-            const disease = DISEASES.find((d) => d.code === s.disease);
-            return (
-              <div key={s.disease} className="score-card">
-                <div className="score-card__top">
-                  <div>
-                    <div className="title">{disease.name}</div>
-                    <div className="subtitle">{disease.description}</div>
-                  </div>
-                  <div className="value">
-                    <div className="pct">{formatPct(s.score)}</div>
-                    <div className="ratio">
-                      {s.numerator.toFixed(0)} / {s.denominator.toFixed(0)}
+          {/* tampilkan hanya penyakit dengan skor tertinggi */}
+          {scores
+            .filter((s) => s.score === Math.max(...scores.map((x) => x.score)))
+            .map((s) => {
+              const disease = DISEASES.find((d) => d.code === s.disease);
+              return (
+                <div key={s.disease} className="score-card highlight">
+                  <div className="score-card__top">
+                    <div>
+                      <div className="title">{disease.name}</div>
+                      <div className="subtitle">{disease.description}</div>
+                    </div>
+                    <div className="value">
+                      <div className="pct">{formatPct(s.score)}</div>
+                      <div className="ratio">
+                        {s.numerator.toFixed(0)} / {s.denominator.toFixed(0)}
+                      </div>
                     </div>
                   </div>
+                  <div className="progress">
+                    <div
+                      className="bar"
+                      style={{ width: `${Math.min(100, s.score * 100)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="progress">
-                  <div
-                    className="bar"
-                    style={{ width: `${Math.min(100, s.score * 100)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
           {top && (
             <div className="callout">
@@ -269,12 +289,12 @@ export default function App() {
                 {DISEASES.find((d) => d.code === top.disease)?.name}
               </div>
               <p>
-                Hasil otomatis berdasarkan gejala yang dipilih & bobot dari
-                penelitian.
+                Hasil otomatis berdasarkan gejala yang dipilih & bobot dari penelitian.
               </p>
             </div>
           )}
 
+          {/* Bagian revise */}
           <div className="revise">
             <div className="revise__title">Revise (opsional)</div>
             <div className="revise__options">
@@ -312,38 +332,29 @@ export default function App() {
           </div>
         </section>
 
+        {/* Panel kanan */}
         <section className="panel panel-right">
           <h2 className="panel__heading">Case Base (Reuse / Retain)</h2>
           {cases.length === 0 ? (
             <p className="muted">
-              Belum ada kasus tersimpan. Simpan kasus dari panel hasil untuk
-              mulai membangun basis kasus.
+              Belum ada kasus tersimpan. Simpan kasus dari panel hasil untuk mulai membangun basis kasus.
             </p>
           ) : (
             <ul className="case-list">
               {cases.map((c) => (
                 <li key={c.id} className="case-card">
-                  <div className="meta">
-                    {new Date(c.createdAt).toLocaleString()}
-                  </div>
+                  <div className="meta">{new Date(c.createdAt).toLocaleString()}</div>
                   <div className="result">
                     Hasil:{" "}
-                    <strong>
-                      {DISEASES.find((d) => d.code === c.result)?.name}
-                    </strong>
+                    <strong>{DISEASES.find((d) => d.code === c.result)?.name}</strong>
                   </div>
                   <div className="meta">Gejala: {c.symptoms.join(", ")}</div>
                   <div className="meta">
-                    Skor — P1: {formatPct(c.rawScores.P1)}, P2:{" "}
-                    {formatPct(c.rawScores.P2)}, P3: {formatPct(c.rawScores.P3)}
+                    Skor — P1: {formatPct(c.rawScores.P1)}, P2: {formatPct(c.rawScores.P2)}, P3: {formatPct(c.rawScores.P3)}
                   </div>
                   <div className="case-card__actions">
-                    <button className="btn" onClick={() => reuseCase(c.id)}>
-                      Reuse
-                    </button>
-                    <button className="btn" onClick={() => deleteCase(c.id)}>
-                      Hapus
-                    </button>
+                    <button className="btn" onClick={() => reuseCase(c.id)}>Reuse</button>
+                    <button className="btn" onClick={() => deleteCase(c.id)}>Hapus</button>
                   </div>
                 </li>
               ))}
@@ -353,7 +364,7 @@ export default function App() {
       </main>
 
       <footer className="app__footer">
-        © {new Date().getFullYear()} Kelompok 4 Sistem Berbasis Pengetahuana
+        © {new Date().getFullYear()} Kelompok 4 Sistem Berbasis Pengetahuan
       </footer>
     </div>
   );
