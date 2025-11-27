@@ -1,292 +1,410 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
+/* =========================
+   DATA: Diseases & Symptoms
+   (Bobot sesuai tabel paper)
+   ========================= */
 const DISEASES = [
-  { code: "P1", name: "Generalized Anxiety Disorder (GAD)", description: "Kecemasan berlebihan dan kronis akan berbagai aspek kehidupan." },
-  { code: "P2", name: "Panic Disorder", description: "Serangan panik berulang dengan gejala fisik yang kuat." },
-  { code: "P3", name: "Specific Phobias", description: "Ketakutan intens & irasional terhadap objek/situasi tertentu." },
+  { code: "P1", name: "Generalized Anxiety Disorder (GAD)" },
+  { code: "P2", name: "Panic Disorder" },
+  { code: "P3", name: "Specific Phobias" },
 ];
 
 const SYMPTOMS = [
-  { code: "G01", name: "Nyeri otot" },
-  { code: "G02", name: "Kesulitan tidur" },
-  { code: "G03", name: "Mudah merasakan lelah" },
-  { code: "G04", name: "Mual" },
-  { code: "G05", name: "Sakit kepala" },
-  { code: "G06", name: "Kecemasan berlebih" },
-  { code: "G07", name: "Merasa gelisah" },
-  { code: "G08", name: "Sulit berkonsentrasi" },
-  { code: "G09", name: "Kewaspadaan yang berlebihan" },
-  { code: "G10", name: "Mudah marah" },
-  { code: "G11", name: "Kebutuhan untuk kontrol" },
-  { code: "G12", name: "Jantung berdebar-debar" },
-  { code: "G13", name: "Keringat berlebih" },
-  { code: "G14", name: "Gemetar tidak terkendali" },
-  { code: "G15", name: "Sesak napas" },
-  { code: "G16", name: "Nyeri dada" },
-  { code: "G17", name: "Kesemutan" },
-  { code: "G18", name: "Menggigil" },
-  { code: "G19", name: "Merasa kehilangan kendali" },
-  { code: "G20", name: "Menghindari tempat/situasi tertentu (serangan sebelumnya)" },
-  { code: "G21", name: "Menghindari situasi yang diasosiasikan dgn serangan panik" },
-  { code: "G22", name: "Menghindari tempat ramai" },
-  { code: "G23", name: "Ketakutan intens" },
-  { code: "G24", name: "Sensasi tersendak" },
-  { code: "G25", name: "Kehilangan kekuatan otot" },
-  { code: "G26", name: "Mengambil langkah besar untuk menghindari objek/situasi ditakuti" },
-  { code: "G27", name: "Menggunakan berbagai cara agar merasa aman" },
+  { code: "G01", name: "Nyeri otot", weights: { P1: 1 } },
+  { code: "G02", name: "Kesulitan tidur", weights: { P1: 2 } },
+  { code: "G03", name: "Mudah merasa lelah", weights: { P1: 1 } },
+  { code: "G04", name: "Mual", weights: { P1: 1, P2: 1, P3: 1 } },
+  { code: "G05", name: "Sakit kepala", weights: { P1: 1, P2: 1, P3: 1 } },
+  { code: "G06", name: "Kecemasan berlebih", weights: { P1: 1, P2: 1 } },
+  { code: "G07", name: "Merasa gelisah", weights: { P1: 1, P3: 1 } },
+  { code: "G08", name: "Sulit berkonsentrasi", weights: { P1: 2 } },
+  { code: "G09", name: "Kewaspadaan yang berlebihan", weights: { P1: 1 } },
+  { code: "G10", name: "Mudah marah", weights: { P1: 1 } },
+  { code: "G11", name: "Kebutuhan untuk kontrol", weights: { P1: 2 } },
+  { code: "G12", name: "Jantung berdebar-debar", weights: { P2: 2 } },
+  { code: "G13", name: "Keringat berlebih", weights: { P2: 2 } },
+  { code: "G14", name: "Gemetar tidak terkendali", weights: { P2: 1, P3: 1 } },
+  { code: "G15", name: "Sesak napas", weights: { P2: 1, P3: 1 } },
+  { code: "G16", name: "Nyeri dada", weights: { P2: 1 } },
+  { code: "G17", name: "Kesemutan", weights: { P2: 1 } },
+  { code: "G18", name: "Menggigil", weights: { P2: 2 } },
+  { code: "G19", name: "Merasa kehilangan kendali", weights: { P2: 2 } },
+  {
+    code: "G20",
+    name: "Menghindari tempat/situasi (serangan sebelumnya)",
+    weights: { P2: 4 },
+  },
+  {
+    code: "G21",
+    name: "Menghindari situasi yang diasosiasikan dgn serangan panik",
+    weights: { P2: 4 },
+  },
+  { code: "G22", name: "Menghindari tempat ramai", weights: { P2: 3 } },
+  { code: "G23", name: "Ketakutan intens", weights: { P3: 3 } },
+  { code: "G24", name: "Sensasi tersendak", weights: { P3: 3 } },
+  { code: "G25", name: "Kehilangan kekuatan otot", weights: { P3: 2 } },
+  {
+    code: "G26",
+    name: "Langkah besar menghindari objek/situasi ditakuti",
+    weights: { P3: 4 },
+  },
+  { code: "G27", name: "Berbagai cara agar merasa aman", weights: { P3: 3 } },
 ];
 
-const DISEASE_TYPES = [
-  { id: "P1-A", disease: "P1", name: "GAD Tipe A", weights: { G04: 1, G05: 1, G07: 1, G08: 2 } },
-  { id: "P1-B", disease: "P1", name: "GAD Tipe B", weights: { G05: 1, G07: 1, G08: 2, G14: 1 } },
-  { id: "P1-C", disease: "P1", name: "GAD Tipe C", weights: { G04: 1, G05: 1, G07: 1, G08: 2, G27: 3 } },
-  { id: "P2-A", disease: "P2", name: "Panic Disorder Tipe A", weights: { G04: 1, G05: 1, G14: 1, G17: 1, G20: 4 } },
-  { id: "P2-B", disease: "P2", name: "Panic Disorder Tipe B", weights: { G04: 1, G05: 1, G08: 2, G14: 1 } },
-  { id: "P2-C", disease: "P2", name: "Panic Disorder Tipe C", weights: { G04: 1, G05: 1, G08: 2, G14: 1, G17: 1 } },
-  { id: "P3-A", disease: "P3", name: "Specific Phobias Tipe A", weights: { G04: 1, G05: 1, G07: 1, G14: 1, G25: 2, G26: 4, G27: 3 } },
-  { id: "P3-B", disease: "P3", name: "Specific Phobias Tipe B", weights: { G04: 1, G14: 1, G20: 4, G25: 2, G26: 4, G27: 3 } },
-  { id: "P3-C", disease: "P3", name: "Specific Phobias Tipe C", weights: { G14: 1, G25: 2, G26: 4, G27: 3 } },
-];
+const STORAGE_KEY = "cbr_newcases_v1";
 
-const TARGET_CASE = new Set(["G05", "G26", "G08", "G14", "G20", "G07", "G17", "G25", "G04", "G27"]);
+/* helper: find symptom data */
+const getSymptom = (code) => SYMPTOMS.find((s) => s.code === code) || null;
 
-const TARGET_SCORES = {
-  "P1-A": 0.357, "P1-B": 0.385, "P1-C": 0.571,
-  "P2-A": 0.307, "P2-B": 0.357, "P2-C": 0.429,
-  "P3-A": 0.65, "P3-B": 0.714, "P3-C": 0.476,
-};
-
-function computeNumeratorForSelection(selectionSet, weights) {
-  let numerator = 0;
-  for (const [code, w] of Object.entries(weights)) {
-    if (selectionSet.has(code)) numerator += Number(w) || 0;
-  }
-  return numerator;
-}
-
-const NORMALIZATION = (() => {
-  const map = {};
-  for (const t of DISEASE_TYPES) {
-    const numer = computeNumeratorForSelection(TARGET_CASE, t.weights);
-    const target = TARGET_SCORES[t.id] || 0.0;
-    map[t.id] = target > 0 && numer > 0 ? numer / target : Object.values(t.weights).reduce((s, v) => s + v, 0);
-  }
-  return map;
-})();
-
-function computeCalibratedScore(selectedSet, type) {
-  const weights = type.weights || {};
-  let numer = 0;
-  for (const [code, w] of Object.entries(weights)) {
-    if (selectedSet.has(code)) numer += Number(w) || 0;
-  }
-  const norm = NORMALIZATION[type.id] || 1;
-  return Math.max(0, Math.min(1, numer / norm));
-}
-
-function formatPctDecimal(x) {
-  return `${(x * 100).toFixed(1)}%`;
-}
-
-function computeGlobalP123(selectedSet) {
-  const maxWeights = {};
-  for (const t of DISEASE_TYPES) {
-    for (const [code, w] of Object.entries(t.weights)) {
-      if (!maxWeights[code]) maxWeights[code] = {};
-      const prev = maxWeights[code][t.disease] || 0;
-      if (w > prev) maxWeights[code][t.disease] = w;
-    }
-  }
-
+/* precompute total weights per disease from table (denominator) */
+function computeTotalWeightsPerDisease() {
   const totals = { P1: 0, P2: 0, P3: 0 };
-  const denoms = { P1: 0, P2: 0, P3: 0 };
-
-  for (const code of SYMPTOMS.map((s) => s.code)) {
-    const mw = maxWeights[code] || {};
-    for (const d of ["P1", "P2", "P3"]) {
-      const w = mw[d] || 0;
-      if (w > 0) {
-        denoms[d] += w;
-        if (selectedSet.has(code)) totals[d] += w;
-      }
+  for (const s of SYMPTOMS) {
+    for (const d of Object.keys(totals)) {
+      const w = s.weights?.[d] || 0;
+      totals[d] += w;
     }
   }
-
-  return {
-    P1: totals.P1 / (denoms.P1 || 1),
-    P2: totals.P2 / (denoms.P2 || 1),
-    P3: totals.P3 / (denoms.P3 || 1),
-  };
+  return totals;
 }
 
-const STORAGE_KEY = "cbr_anxiety_cases_v1";
+/* formatting */
+function fmtPct(x) {
+  // show percentage with 4 decimal places to be precise
+  return `${(x * 100).toFixed(4)}%`;
+}
 
+/* compute similarity per disease between selected (new case) and disease table */
+function computeSimilarityPerDisease(selectedSet, totalsDenom) {
+  // numerator per disease = sum of weights of selected symptoms that belong to disease
+  const numerators = { P1: 0, P2: 0, P3: 0 };
+  for (const code of selectedSet) {
+    const s = getSymptom(code);
+    if (!s) continue;
+    for (const d of Object.keys(numerators)) {
+      const w = s.weights?.[d] || 0;
+      numerators[d] += w;
+    }
+  }
+  const results = {};
+  for (const d of Object.keys(numerators)) {
+    const denom = totalsDenom[d] || 1; // avoid div0
+    const ratio = denom === 0 ? 0 : numerators[d] / denom;
+    results[d] = { matched: numerators[d], total: denom, ratio };
+  }
+  return results;
+}
+
+/* =========================
+   React Component
+   ========================= */
 export default function App() {
-  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(new Set());
-  const [cases, setCases] = useState([]);
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+  const [cases, setCases] = useState([]); // stored new cases (history)
+  const [showMath, setShowMath] = useState(false);
+  const [expandedMathFor, setExpandedMathFor] = useState(null);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setCases(JSON.parse(raw));
+    } catch {}
+  }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return SYMPTOMS;
-    return SYMPTOMS.filter((s) => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
-  }, [query]);
+  // denom totals based on table
+  const totalsDenom = useMemo(() => computeTotalWeightsPerDisease(), []);
 
-  const typeScores = useMemo(() => DISEASE_TYPES.map((t) => ({ ...t, score: computeCalibratedScore(selected, t) })), [selected]);
+  // live similarity for current selected (new case)
+  const liveSimilarity = useMemo(() => {
+    return computeSimilarityPerDisease(selected, totalsDenom);
+  }, [selected, totalsDenom]);
 
-  const groupedByDisease = useMemo(() => {
-    const map = { P1: [], P2: [], P3: [] };
-    for (const t of typeScores) map[t.disease].push(t);
-    return map;
-  }, [typeScores]);
+  // predicted disease (highest ratio; tie-breaker by matched weight)
+  const predicted = useMemo(() => {
+    const arr = Object.entries(liveSimilarity).map(([d, v]) => ({
+      code: d,
+      ...v,
+    }));
+    arr.sort((a, b) => {
+      if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+      return b.matched - a.matched;
+    });
+    return arr[0] || null;
+  }, [liveSimilarity]);
 
-  const winners = useMemo(() => {
-    const w = new Set();
-    for (const d of ["P1", "P2", "P3"]) {
-      const arr = groupedByDisease[d];
-      if (!arr.length) continue;
-      let best = arr[0];
-      for (const it of arr) if (it.score > best.score) best = it;
-      w.add(best.id);
-    }
-    return w;
-  }, [groupedByDisease]);
+  const toggleSymptom = (code) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  };
 
-  // ✅ FIXED — TOP 3 OVERALL (unik per penyakit)
-  const topThreeOverall = useMemo(() => {
-    if (selected.size === 0) return [];
-    const validScores = typeScores.filter((t) => t.score > 0);
-    const sorted = [...validScores].sort((a, b) => b.score - a.score);
-    const picked = [];
-    const usedDisease = new Set();
-    for (const t of sorted) {
-      if (!usedDisease.has(t.disease)) {
-        picked.push(t);
-        usedDisease.add(t.disease);
-      }
-      if (picked.length === 3) break;
-    }
-    return picked;
-  }, [typeScores, selected]);
-
-  const toggle = (code) => setSelected((prev) => {
-    const next = new Set(prev);
-    next.has(code) ? next.delete(code) : next.add(code);
-    return next;
-  });
-
-  const clearAll = () => setSelected(new Set());
+  const reset = () => {
+    setSelected(new Set());
+    setExpandedMathFor(null);
+  };
 
   const retain = () => {
-    if (selected.size === 0) return;
-    const rawScores = computeGlobalP123(selected);
+    // save current new-case as next training case
+    const id = `CASE-${Date.now()}`;
     const payload = {
-      id: crypto.randomUUID(),
+      id,
       createdAt: new Date().toISOString(),
       symptoms: Array.from(selected),
-      rawScores,
+      result: predicted?.code || null,
+      scores: {
+        P1: liveSimilarity.P1.ratio,
+        P2: liveSimilarity.P2.ratio,
+        P3: liveSimilarity.P3.ratio,
+      },
     };
     const next = [payload, ...cases];
     setCases(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {}
   };
 
-  const deleteCase = (id) => {
-    const next = cases.filter((c) => c.id !== id);
-    setCases(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  const reuse = (c) => {
+    setSelected(new Set(c.symptoms));
   };
+
+  const removeCase = (id) => {
+    const next = cases.filter((r) => r.id !== id);
+    setCases(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+  };
+
+  const diseaseName = (code) =>
+    DISEASES.find((d) => d.code === code)?.name || code;
 
   return (
-    <div className="app dark-dashboard">
-      <header className="app__header">
-        <div className="header__left">
-          <h1 className="brand">CBR Expert System</h1>
-          <div className="subtitle">Anxiety Disorders — CBR (calibrated similarity)</div>
+    <div className="app-root">
+      <header className="topbar">
+        <div className="brand">
+          <h1>CBR — New-cases (paper logic) </h1>
+          <div className="muted">
+            Similarity per penyakit = Σ bobot(gejala terpilih & termasuk
+            penyakit) / Σ bobot(semua gejala penyakit)
+          </div>
         </div>
-        <div className="header__right">
-          <button className="btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? "🌞 Light Mode" : "🌙 Dark Mode"}
+
+        <div className="top-actions">
+          <button className="btn" onClick={reset}>
+            Reset
+          </button>
+          {/* <button className="btn" onClick={() => setShowMath((s) => !s)}>
+            {showMath ? "Hide math" : "Show math"}
+          </button> */}
+          <button
+            className="btn btn--primary"
+            onClick={retain}
+            disabled={selected.size === 0}
+          >
+            Retain: Simpan Kasus
           </button>
         </div>
       </header>
 
-      <main className="layout">
-        {/* Panel kiri */}
-        <section className="panel panel-left">
-          <h2>Gejala (Checklist)</h2>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari kode/nama gejala..." />
-          <button className="btn" onClick={clearAll}>Reset</button>
+      <main className="grid">
+        {/* LEFT: checklist */}
+        <section className="panel left">
+          <h2>Gejala (pilih untuk kasus baru)</h2>
           <ul className="symptom-list">
-            {filtered.map((row) => (
-              <li key={row.code}>
-                <input type="checkbox" id={row.code} checked={selected.has(row.code)} onChange={() => toggle(row.code)} />
-                <label htmlFor={row.code}>{row.code} — {row.name}</label>
+            {SYMPTOMS.map((s) => (
+              <li key={s.code} className="symptom-item">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(s.code)}
+                    onChange={() => toggleSymptom(s.code)}
+                  />
+                  <div className="symptom-meta">
+                    <div className="symptom-code">
+                      {s.code} — <span className="symptom-name">{s.name}</span>
+                    </div>
+                    <div className="symptom-chips muted">
+                      {["P1", "P2", "P3"]
+                        .filter((d) => (s.weights?.[d] || 0) > 0)
+                        .map((d) => `${d}:w${s.weights[d]}`)
+                        .join(" • ")}
+                    </div>
+                  </div>
+                </label>
               </li>
             ))}
           </ul>
         </section>
 
-        {/* Panel tengah */}
-        <section className="panel panel-mid">
-          <h2>Hasil Similarity & Penjelasan</h2>
-          {selected.size === 0 ? (
-            <p>Pilih gejala untuk melihat hasil.</p>
-          ) : (
-            <>
-              {typeScores.map((item) => {
-                const disease = DISEASES.find((d) => d.code === item.disease);
-                const isWinner = winners.has(item.id);
-                return (
-                  <div key={item.id} className={`score-card ${isWinner ? "highlight-green" : ""}`}>
-                    <div className="title">{item.name}</div>
-                    <div className="subtitle">{disease?.description}</div>
-                    <div className="pct">{formatPctDecimal(item.score)}</div>
-                    <div className="progress">
-                      <div className="bar" style={{ width: `${item.score * 100}%` }}></div>
+        {/* MIDDLE: live similarity */}
+        <section className="panel mid">
+          <h2>Hasil Similarity (kasus baru sekarang)</h2>
+
+          <div className="live-cards">
+            {Object.entries(liveSimilarity).map(([code, v]) => (
+              <div
+                key={code}
+                className={`live-card ${
+                  predicted?.code === code ? "live-card--top" : ""
+                }`}
+              >
+                <div className="live-left">
+                  <div className="disease-title">{diseaseName(code)}</div>
+                  <div className="muted small">
+                    matched: {v.matched} / total: {v.total}
+                  </div>
+                </div>
+                <div className="live-right">
+                  <div className="score">{fmtPct(v.ratio)}</div>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() =>
+                      setExpandedMathFor(expandedMathFor === code ? null : code)
+                    }
+                  >
+                    {expandedMathFor === code ? "Hide math" : "Show math"}
+                  </button>
+                </div>
+
+                <div className="progress small">
+                  <div
+                    className="bar"
+                    style={{ width: `${Math.min(100, v.ratio * 100)}%` }}
+                  />
+                </div>
+
+                {expandedMathFor === code && (
+                  <div className="math-block muted">
+                    <div>
+                      <b>Numerator (matched weight):</b> {v.matched}
+                    </div>
+                    <div>
+                      <b>Denominator (total disease weight):</b> {v.total}
+                    </div>
+                    <div>
+                      Ratio = {v.matched} / {v.total} = {fmtPct(v.ratio)}
                     </div>
                   </div>
-                );
-              })}
-              <div className="callout">
-                <div className="callout__label">Top 3 Overall</div>
-                {topThreeOverall.map((it, idx) => (
-                  <div key={it.id}>{idx + 1}. {it.name} — {formatPctDecimal(it.score)}</div>
-                ))}
+                )}
               </div>
-            </>
-          )}
-          <button className="btn btn--primary" onClick={retain} disabled={selected.size === 0}>Retain Kasus</button>
+            ))}
+          </div>
+
+          <div className="callout">
+            <div className="callout-left">
+              <div className="muted">Diagnosis otomatis</div>
+              <div className="callout-title">
+                {predicted ? diseaseName(predicted.code) : "—"}
+              </div>
+            </div>
+            <div className="callout-right">
+              <div className="callout-score">
+                {predicted ? fmtPct(predicted.ratio) : "-"}
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* ✅ Panel kanan dikembalikan */}
-        <section className="panel panel-right">
-          <h2>Case Base (Reuse / Retain)</h2>
+        {/* RIGHT: stored case base */}
+        <section className="panel right">
+          <h2>Case Base — Kasus tersimpan</h2>
+          <p className="muted">
+            Setiap kali tekan "Retain", kasus baru disimpan di sini
+            (history/training).
+          </p>
+
           {cases.length === 0 ? (
             <p className="muted">Belum ada kasus tersimpan.</p>
           ) : (
             <ul className="case-list">
               {cases.map((c) => (
-                <li key={c.id} className="case-card">
-                  <div className="meta">{new Date(c.createdAt).toLocaleString()}</div>
-                  <div className="meta">Gejala: {c.symptoms.join(", ")}</div>
-                  <div className="meta">
-                    Skor — P1: {(c.rawScores.P1 * 100).toFixed(1)}%, P2: {(c.rawScores.P2 * 100).toFixed(1)}%, P3: {(c.rawScores.P3 * 100).toFixed(1)}%
+                <li key={c.id} className="case-row">
+                  <div className="case-row-top">
+                    <div>
+                      <b>{c.id}</b> •{" "}
+                      <span className="muted small">
+                        {new Date(c.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="case-actions">
+                      <button className="btn btn-sm" onClick={() => reuse(c)}>
+                        Reuse
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => removeCase(c.id)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
                   </div>
-                  <button className="btn" onClick={() => deleteCase(c.id)}>Hapus</button>
+                  <div className="muted small">
+                    Assigned: {c.result ? diseaseName(c.result) : "-"}
+                  </div>
+                  <div className="muted small">
+                    Scores — P1: {fmtPct(c.scores.P1)} • P2:{" "}
+                    {fmtPct(c.scores.P2)} • P3: {fmtPct(c.scores.P3)}
+                  </div>
+                  <div className="muted small">
+                    Gejala: {c.symptoms.join(", ") || "-"}
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </section>
       </main>
+
+      {/* bottom table: ringkasan semua kasus */}
+      <section className="panel bottom">
+        <h2>Summary Table — Semua Kasus Tersimpan</h2>
+        <div className="table-wrap">
+          <table className="summary-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Waktu</th>
+                <th>Result</th>
+                <th>P1</th>
+                <th>P2</th>
+                <th>P3</th>
+                <th>Gejala</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cases.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="muted">
+                    Belum ada kasus tersimpan.
+                  </td>
+                </tr>
+              ) : (
+                cases.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.id}</td>
+                    <td>{new Date(c.createdAt).toLocaleString()}</td>
+                    <td>{c.result ? diseaseName(c.result) : "-"}</td>
+                    <td>{fmtPct(c.scores.P1)}</td>
+                    <td>{fmtPct(c.scores.P2)}</td>
+                    <td>{fmtPct(c.scores.P3)}</td>
+                    <td style={{ minWidth: 200 }}>{c.symptoms.join(", ")}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer className="footer">
+        © {new Date().getFullYear()} CBR — New-case training (paper logic)
+      </footer>
     </div>
   );
 }
