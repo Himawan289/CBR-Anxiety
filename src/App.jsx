@@ -23,7 +23,7 @@ const SYMPTOMS = [
   { code: "G09", name: "Kewaspadaan yang berlebihan", weights: { P1: 1 } },
   { code: "G10", name: "Mudah marah", weights: { P1: 1 } },
   { code: "G11", name: "Kebutuhan untuk kontrol", weights: { P1: 2 } },
-  { code: "G12", name: "Jantung berdebar-debar", weights: { P2: 2 } },
+  { code: "G12", name: "Jantung berdebar", weights: { P2: 2 } },
   { code: "G13", name: "Keringat berlebih", weights: { P2: 2 } },
   { code: "G14", name: "Gemetar tidak terkendali", weights: { P2: 1, P3: 1 } },
   { code: "G15", name: "Sesak napas", weights: { P2: 1, P3: 1 } },
@@ -53,7 +53,7 @@ const SYMPTOMS = [
   { code: "G27", name: "Berbagai cara agar merasa aman", weights: { P3: 3 } },
 ];
 
-const STORAGE_KEY = "cbr_newcases_v1";
+const STORAGE_KEY = "cbr_newcases_v_final";
 
 /* helper: find symptom data */
 const getSymptom = (code) => SYMPTOMS.find((s) => s.code === code) || null;
@@ -71,14 +71,16 @@ function computeTotalWeightsPerDisease() {
 }
 
 /* formatting */
-function fmtPct(x) {
-  // show percentage with 4 decimal places to be precise
-  return `${(x * 100).toFixed(4)}%`;
+function fmtPct(x, digits = 4) {
+  if (typeof x !== "number" || isNaN(x)) return "-";
+  return `${(x * 100).toFixed(digits)}%`;
 }
 
-/* compute similarity per disease between selected (new case) and disease table */
+/* compute similarity per disease between selected (new case) and disease table
+   Numerator: sum weights of selected symptoms that belong to disease d.
+   Denominator: total weights of disease d (precomputed).
+*/
 function computeSimilarityPerDisease(selectedSet, totalsDenom) {
-  // numerator per disease = sum of weights of selected symptoms that belong to disease
   const numerators = { P1: 0, P2: 0, P3: 0 };
   for (const code of selectedSet) {
     const s = getSymptom(code);
@@ -90,11 +92,63 @@ function computeSimilarityPerDisease(selectedSet, totalsDenom) {
   }
   const results = {};
   for (const d of Object.keys(numerators)) {
-    const denom = totalsDenom[d] || 1; // avoid div0
+    const denom = totalsDenom[d] || 1;
     const ratio = denom === 0 ? 0 : numerators[d] / denom;
     results[d] = { matched: numerators[d], total: denom, ratio };
   }
   return results;
+}
+
+/* compute similarity between new-case selectedSet and a stored case (sourceCase),
+   using the disease label of sourceCase (sourceCase.result).
+   Numerator: sum weights_{d_src} of intersection(new, sourceCase.symptoms)
+   Denominator: total weights of disease d_src (totalsDenom[d_src])
+*/
+function computeCaseToCaseSimilarity(selectedSet, sourceCase) {
+  // sourceCase.weights must exist (mapping gejala -> weight for that case)
+  const dsrc = sourceCase.result || null;
+  const weights = sourceCase.weights || {}; // prefer stored per-case weights
+
+  // intersection
+  const intersection = [...selectedSet].filter((g) =>
+    sourceCase.symptoms.includes(g)
+  );
+
+  // sum using sourceCase.weights (fallback to SYMPTOMS table weight for dsrc if not present)
+  let matched = 0;
+  for (const g of intersection) {
+    // prefer case.weights
+    const w_case = typeof weights[g] === "number" ? weights[g] : null;
+    if (w_case !== null) {
+      matched += w_case;
+      continue;
+    }
+    // fallback: use SYMPTOMS weight for sourceCase.result disease
+    const s = getSymptom(g);
+    const w = s?.weights?.[dsrc] || 0;
+    matched += w;
+  }
+
+  // denominator: total weight of sourceCase (sum of sourceCase.weights if exists)
+  let total = 0;
+  if (Object.keys(weights).length > 0) {
+    total = Object.values(weights).reduce((a, b) => a + b, 0);
+  } else {
+    // fallback: sum of SYMPTOMS weights for disease dsrc across sourceCase.symptoms
+    for (const g of sourceCase.symptoms) {
+      const s = getSymptom(g);
+      total += s?.weights?.[dsrc] || 0;
+    }
+  }
+
+  const ratio = total === 0 ? 0 : matched / total;
+  return { matched, total, ratio, dsrc };
+}
+
+/* generate CASE-00X id based on existing count */
+function formatCaseId(count) {
+  const n = count + 1; // next index
+  return `CASE-${String(n).padStart(3, "0")}`;
 }
 
 /* =========================
@@ -103,28 +157,30 @@ function computeSimilarityPerDisease(selectedSet, totalsDenom) {
 export default function App() {
   const [selected, setSelected] = useState(new Set());
   const [cases, setCases] = useState([]); // stored new cases (history)
-  const [showMath, setShowMath] = useState(false);
-  const [expandedMathFor, setExpandedMathFor] = useState(null);
+  const [expandedCaseId, setExpandedCaseId] = useState(null);
 
+  // load stored cases
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setCases(JSON.parse(raw));
-    } catch {}
+    } catch (e) {
+      // ignore
+    }
   }, []);
 
-  // denom totals based on table
+  // totals denom precomputed
   const totalsDenom = useMemo(() => computeTotalWeightsPerDisease(), []);
 
-  // live similarity for current selected (new case)
+  // live disease similarity
   const liveSimilarity = useMemo(() => {
     return computeSimilarityPerDisease(selected, totalsDenom);
   }, [selected, totalsDenom]);
 
-  // predicted disease (highest ratio; tie-breaker by matched weight)
+  // predicted disease (highest ratio, tie-breaker highest matched)
   const predicted = useMemo(() => {
-    const arr = Object.entries(liveSimilarity).map(([d, v]) => ({
-      code: d,
+    const arr = Object.entries(liveSimilarity).map(([code, v]) => ({
+      code,
       ...v,
     }));
     arr.sort((a, b) => {
@@ -145,28 +201,82 @@ export default function App() {
 
   const reset = () => {
     setSelected(new Set());
-    setExpandedMathFor(null);
+    setExpandedCaseId(null);
   };
 
   const retain = () => {
-    // save current new-case as next training case
-    const id = `CASE-${Date.now()}`;
+    // prepare id incremental
+    const id = formatCaseId(cases.length);
+    const createdAt = new Date().toISOString();
+
+    // compute disease scores (use liveSimilarity)
+    const scores = {
+      P1: liveSimilarity.P1.ratio,
+      P2: liveSimilarity.P2.ratio,
+      P3: liveSimilarity.P3.ratio,
+    };
+
+    // assigned disease (predicted); if tie or none, assigned null
+    const assigned = predicted?.code || null;
+
+    // build comparisons:
+    // first comparison entry = aggregate vs diseases (this is one row)
+    const comparisons = [];
+    comparisons.push({
+      type: "diseases",
+      label: "vs diseases (P1,P2,P3)",
+      values: {
+        P1: {
+          matched: liveSimilarity.P1.matched,
+          total: liveSimilarity.P1.total,
+          ratio: liveSimilarity.P1.ratio,
+        },
+        P2: {
+          matched: liveSimilarity.P2.matched,
+          total: liveSimilarity.P2.total,
+          ratio: liveSimilarity.P2.ratio,
+        },
+        P3: {
+          matched: liveSimilarity.P3.matched,
+          total: liveSimilarity.P3.total,
+          ratio: liveSimilarity.P3.ratio,
+        },
+      },
+    });
+
+    // second: comparisons to each existing retained case (case→case) using source case's assigned disease
+    for (const src of cases) {
+      const sim = computeCaseToCaseSimilarity(selected, src, totalsDenom);
+      comparisons.push({
+        type: "case",
+        label: `vs ${src.id} (base:${src.result || "-"})`,
+        srcId: src.id,
+        matched: sim.matched,
+        total: sim.total,
+        ratio: sim.ratio,
+        dsrc: sim.dsrc || src.result || null,
+      });
+    }
+
+    // payload to save
     const payload = {
       id,
-      createdAt: new Date().toISOString(),
+      createdAt,
       symptoms: Array.from(selected),
-      result: predicted?.code || null,
-      scores: {
-        P1: liveSimilarity.P1.ratio,
-        P2: liveSimilarity.P2.ratio,
-        P3: liveSimilarity.P3.ratio,
-      },
+      result: assigned,
+      scores,
+      comparisons, // store the comparisons snapshot at the time of retain
     };
+
     const next = [payload, ...cases];
     setCases(next);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {}
+    } catch (e) {
+      // ignore
+    }
+
+    // keep selection as-is OR clear? We keep selected so user sees it — they can reset manually
   };
 
   const reuse = (c) => {
@@ -178,7 +288,9 @@ export default function App() {
     setCases(next);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {}
+    } catch (e) {
+      // ignore
+    }
   };
 
   const diseaseName = (code) =>
@@ -188,10 +300,13 @@ export default function App() {
     <div className="app-root">
       <header className="topbar">
         <div className="brand">
-          <h1>CBR — New-cases (paper logic) </h1>
+          <h1>CBR — New-case (paper-flow)</h1>
           <div className="muted">
-            Similarity per penyakit = Σ bobot(gejala terpilih & termasuk
-            penyakit) / Σ bobot(semua gejala penyakit)
+            Similarity = Σ bobot(gejala terpilih & termasuk penyakit) / Σ
+            bobot(semua gejala penyakit).
+            <br />
+            Saat retain: case→case membandingkan new-case ke retained-case
+            menggunakan bobot penyakit source-case.
           </div>
         </div>
 
@@ -199,9 +314,6 @@ export default function App() {
           <button className="btn" onClick={reset}>
             Reset
           </button>
-          {/* <button className="btn" onClick={() => setShowMath((s) => !s)}>
-            {showMath ? "Hide math" : "Show math"}
-          </button> */}
           <button
             className="btn btn--primary"
             onClick={retain}
@@ -213,7 +325,7 @@ export default function App() {
       </header>
 
       <main className="grid">
-        {/* LEFT: checklist */}
+        {/* LEFT */}
         <section className="panel left">
           <h2>Gejala (pilih untuk kasus baru)</h2>
           <ul className="symptom-list">
@@ -227,7 +339,8 @@ export default function App() {
                   />
                   <div className="symptom-meta">
                     <div className="symptom-code">
-                      {s.code} — <span className="symptom-name">{s.name}</span>
+                      <strong>{s.code}</strong> —{" "}
+                      <span className="symptom-name">{s.name}</span>
                     </div>
                     <div className="symptom-chips muted">
                       {["P1", "P2", "P3"]
@@ -242,7 +355,7 @@ export default function App() {
           </ul>
         </section>
 
-        {/* MIDDLE: live similarity */}
+        {/* MID */}
         <section className="panel mid">
           <h2>Hasil Similarity (kasus baru sekarang)</h2>
 
@@ -261,37 +374,14 @@ export default function App() {
                   </div>
                 </div>
                 <div className="live-right">
-                  <div className="score">{fmtPct(v.ratio)}</div>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() =>
-                      setExpandedMathFor(expandedMathFor === code ? null : code)
-                    }
-                  >
-                    {expandedMathFor === code ? "Hide math" : "Show math"}
-                  </button>
+                  <div className="score">{fmtPct(v.ratio, 4)}</div>
                 </div>
-
                 <div className="progress small">
                   <div
                     className="bar"
                     style={{ width: `${Math.min(100, v.ratio * 100)}%` }}
                   />
                 </div>
-
-                {expandedMathFor === code && (
-                  <div className="math-block muted">
-                    <div>
-                      <b>Numerator (matched weight):</b> {v.matched}
-                    </div>
-                    <div>
-                      <b>Denominator (total disease weight):</b> {v.total}
-                    </div>
-                    <div>
-                      Ratio = {v.matched} / {v.total} = {fmtPct(v.ratio)}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -305,25 +395,25 @@ export default function App() {
             </div>
             <div className="callout-right">
               <div className="callout-score">
-                {predicted ? fmtPct(predicted.ratio) : "-"}
+                {predicted ? fmtPct(predicted.ratio, 4) : "-"}
               </div>
             </div>
           </div>
         </section>
 
-        {/* RIGHT: stored case base */}
+        {/* RIGHT */}
         <section className="panel right">
           <h2>Case Base — Kasus tersimpan</h2>
           <p className="muted">
-            Setiap kali tekan "Retain", kasus baru disimpan di sini
-            (history/training).
+            Setiap kali tekan "Retain", kasus baru disimpan di sini (history).
+            Klik "Reuse" untuk memuat gejala kasus tersimpan ke panel kiri.
           </p>
 
           {cases.length === 0 ? (
             <p className="muted">Belum ada kasus tersimpan.</p>
           ) : (
             <ul className="case-list">
-              {cases.map((c) => (
+              {cases.map((c, idx) => (
                 <li key={c.id} className="case-row">
                   <div className="case-row-top">
                     <div>
@@ -342,8 +432,19 @@ export default function App() {
                       >
                         Hapus
                       </button>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() =>
+                          setExpandedCaseId(
+                            expandedCaseId === c.id ? null : c.id
+                          )
+                        }
+                      >
+                        {expandedCaseId === c.id ? "Collapse" : "Details"}
+                      </button>
                     </div>
                   </div>
+
                   <div className="muted small">
                     Assigned: {c.result ? diseaseName(c.result) : "-"}
                   </div>
@@ -354,6 +455,33 @@ export default function App() {
                   <div className="muted small">
                     Gejala: {c.symptoms.join(", ") || "-"}
                   </div>
+
+                  {expandedCaseId === c.id && (
+                    <div className="case-comparisons">
+                      <div className="muted small">Comparisons snapshot:</div>
+                      <ul>
+                        {c.comparisons.map((cmp, i) => (
+                          <li key={i} className="muted">
+                            {cmp.type === "diseases" ? (
+                              <div>
+                                vs diseases — P1: {fmtPct(cmp.values.P1.ratio)}{" "}
+                                ({cmp.values.P1.matched}/{cmp.values.P1.total})
+                                • P2: {fmtPct(cmp.values.P2.ratio)} (
+                                {cmp.values.P2.matched}/{cmp.values.P2.total}) •
+                                P3: {fmtPct(cmp.values.P3.ratio)} (
+                                {cmp.values.P3.matched}/{cmp.values.P3.total})
+                              </div>
+                            ) : (
+                              <div>
+                                {cmp.label} — {fmtPct(cmp.ratio)} ({cmp.matched}
+                                /{cmp.total}) base:{cmp.dsrc || "-"}
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -361,41 +489,65 @@ export default function App() {
         </section>
       </main>
 
-      {/* bottom table: ringkasan semua kasus */}
+      {/* bottom summary table */}
       <section className="panel bottom">
-        <h2>Summary Table — Semua Kasus Tersimpan</h2>
+        <h2>
+          Summary Table — Semua Kasus & Perbandingan (snapshot saat retain)
+        </h2>
         <div className="table-wrap">
           <table className="summary-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th>Case ID</th>
                 <th>Waktu</th>
-                <th>Result</th>
-                <th>P1</th>
-                <th>P2</th>
-                <th>P3</th>
-                <th>Gejala</th>
+                <th>Comparison</th>
+                <th>Detail</th>
+                <th>Ratio</th>
               </tr>
             </thead>
             <tbody>
               {cases.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="muted">
+                  <td colSpan="5" className="muted">
                     Belum ada kasus tersimpan.
                   </td>
                 </tr>
               ) : (
-                cases.map((c) => (
-                  <tr key={c.id}>
-                    <td>{c.id}</td>
-                    <td>{new Date(c.createdAt).toLocaleString()}</td>
-                    <td>{c.result ? diseaseName(c.result) : "-"}</td>
-                    <td>{fmtPct(c.scores.P1)}</td>
-                    <td>{fmtPct(c.scores.P2)}</td>
-                    <td>{fmtPct(c.scores.P3)}</td>
-                    <td style={{ minWidth: 200 }}>{c.symptoms.join(", ")}</td>
-                  </tr>
-                ))
+                cases.flatMap((c) =>
+                  c.comparisons.map((cmp, i) => (
+                    <tr key={c.id + "-" + i}>
+                      <td>{c.id}</td>
+                      <td>{new Date(c.createdAt).toLocaleString()}</td>
+                      <td>
+                        {cmp.type === "diseases"
+                          ? "vs diseases (P1,P2,P3)"
+                          : cmp.label}
+                      </td>
+                      <td style={{ minWidth: 240 }}>
+                        {cmp.type === "diseases"
+                          ? `P1: ${fmtPct(cmp.values.P1.ratio)} (${
+                              cmp.values.P1.matched
+                            }/${cmp.values.P1.total}); P2: ${fmtPct(
+                              cmp.values.P2.ratio
+                            )} (${cmp.values.P2.matched}/${
+                              cmp.values.P2.total
+                            }); P3: ${fmtPct(cmp.values.P3.ratio)} (${
+                              cmp.values.P3.matched
+                            }/${cmp.values.P3.total})`
+                          : `${cmp.matched}/${cmp.total} (base:${
+                              cmp.dsrc || "-"
+                            })`}
+                      </td>
+                      <td>
+                        {cmp.type === "diseases"
+                          ? `P1:${fmtPct(cmp.values.P1.ratio)} • P2:${fmtPct(
+                              cmp.values.P2.ratio
+                            )} • P3:${fmtPct(cmp.values.P3.ratio)}`
+                          : fmtPct(cmp.ratio)}
+                      </td>
+                    </tr>
+                  ))
+                )
               )}
             </tbody>
           </table>
